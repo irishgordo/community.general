@@ -204,7 +204,7 @@ msg:
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.community.general.plugins.module_utils.redfish_utils import RedfishUtils
-from ansible.module_utils._text import to_native
+from ansible.module_utils.common.text.converters import to_native
 
 
 # More will be added as module features are expanded
@@ -321,6 +321,9 @@ def main():
 
     # Return data back or fail with proper message
     if result['ret'] is True:
+        if result.get('warning'):
+            module.warn(to_native(result['warning']))
+
         module.exit_json(changed=result['changed'], msg=to_native(result['msg']))
     else:
         module.fail_json(msg=to_native(result['msg']))

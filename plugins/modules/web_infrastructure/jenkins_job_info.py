@@ -33,12 +33,12 @@ options:
     type: str
     description:
       - Password to authenticate with the Jenkins server.
-      - This is a required parameter, if C(token) is not provided.
+      - This is mutually exclusive with I(token).
   token:
     type: str
     description:
       - API token used to authenticate with the Jenkins server.
-      - This is a required parameter, if C(password) is not provided.
+      - This is mutually exclusive with I(password).
   url:
     type: str
     description:
@@ -59,6 +59,11 @@ author:
 '''
 
 EXAMPLES = '''
+# Get all Jenkins jobs anonymously
+- community.general.jenkins_job_info:
+    user: admin
+  register: my_jenkins_job_info
+
 # Get all Jenkins jobs using basic auth
 - community.general.jenkins_job_info:
     user: admin
@@ -146,7 +151,7 @@ except ImportError:
     HAS_JENKINS = False
 
 from ansible.module_utils.basic import AnsibleModule, missing_required_lib
-from ansible.module_utils._text import to_native
+from ansible.module_utils.common.text.converters import to_native
 
 
 def get_jenkins_connection(module):
@@ -231,9 +236,6 @@ def main():
         mutually_exclusive=[
             ['password', 'token'],
             ['name', 'glob'],
-        ],
-        required_one_of=[
-            ['password', 'token'],
         ],
         supports_check_mode=True,
     )

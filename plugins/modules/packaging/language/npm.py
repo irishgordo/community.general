@@ -141,7 +141,7 @@ import os
 import re
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils._text import to_native
+from ansible.module_utils.common.text.converters import to_native
 
 
 class Npm(object):
@@ -181,7 +181,7 @@ class Npm(object):
                 cmd.append('--ignore-scripts')
             if self.unsafe_perm:
                 cmd.append('--unsafe-perm')
-            if self.name and add_package_name:
+            if self.name_version and add_package_name:
                 cmd.append(self.name_version)
             if self.registry:
                 cmd.append('--registry')
@@ -215,14 +215,18 @@ class Npm(object):
         except (getattr(json, 'JSONDecodeError', ValueError)) as e:
             self.module.fail_json(msg="Failed to parse NPM output with error %s" % to_native(e))
         if 'dependencies' in data:
-            for dep in data['dependencies']:
-                if 'missing' in data['dependencies'][dep] and data['dependencies'][dep]['missing']:
+            for dep, props in data['dependencies'].items():
+
+                if 'missing' in props and props['missing']:
                     missing.append(dep)
-                elif 'invalid' in data['dependencies'][dep] and data['dependencies'][dep]['invalid']:
+                elif 'invalid' in props and props['invalid']:
                     missing.append(dep)
                 else:
                     installed.append(dep)
-            if self.name and self.name not in installed:
+                    if 'version' in props and props['version']:
+                        dep_version = dep + '@' + str(props['version'])
+                        installed.append(dep_version)
+            if self.name_version and self.name_version not in installed:
                 missing.append(self.name)
         # Named dependency not installed
         else:

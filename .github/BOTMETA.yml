@@ -1,17 +1,14 @@
 automerge: true
 files:
   plugins/:
-    supershipit: aminvakil russoz
+    supershipit: quidame Ajpantuso
   changelogs/fragments/:
     support: community
   $actions:
     labels: action
-  $actions/aireos.py:
-    labels: aireos cisco networking
-  $actions/ironware.py:
-    maintainers: paulquack
-    labels: ironware networking
-  $actions/shutdown.py:
+  $actions/system/iptables_state.py:
+    maintainers: quidame
+  $actions/system/shutdown.py:
     maintainers: nitzmahone samdoran aminvakil
   $becomes/:
     labels: become
@@ -120,6 +117,8 @@ files:
   $lookups/nios:
     maintainers: $team_networking sganesh-infoblox
     labels: infoblox networking
+  $lookups/random_string.py:
+    maintainers: Akasurde
   $module_utils/:
     labels: module_utils
   $module_utils/gitlab.py:
@@ -142,6 +141,9 @@ files:
   $module_utils/memset.py:
     maintainers: glitchcrab
     labels: cloud memset
+  $module_utils/mh/:
+    maintainers: russoz
+    labels: module_helper
   $module_utils/module_helper.py:
     maintainers: russoz
     labels: module_helper
@@ -344,6 +346,8 @@ files:
   $modules/database/mssql/mssql_db.py:
     maintainers: vedit Jmainguy kenichi-ogawa-1988
     labels: mssql_db
+  $modules/database/saphana/hana_query.py:
+    maintainers: rainerleber
   $modules/database/vertica/:
     maintainers: dareko
   $modules/files/archive.py:
@@ -647,6 +651,9 @@ files:
     maintainers: elasticdog indrajitr tchernomax
     labels: pacman
     ignore: elasticdog
+  $modules/packaging/os/pacman_key.py:
+    maintainers: grawlinson
+    labels: pacman
   $modules/packaging/os/pkgin.py:
     maintainers: $team_solaris L2G jasperla szinck martinm82
     labels: pkgin solaris
@@ -712,8 +719,9 @@ files:
     labels: zypper
     ignore: dirtyharrycallahan robinro
   $modules/packaging/os/zypper_repository.py:
-    maintainers: $team_suse matze
+    maintainers: $team_suse
     labels: zypper
+    ignore: matze
   $modules/remote_management/cobbler/:
     maintainers: dagwieers
   $modules/remote_management/hpilo/:
@@ -842,6 +850,8 @@ files:
     labels: interfaces_file
   $modules/system/iptables_state.py:
     maintainers: quidame
+  $modules/system/shutdown.py:
+    maintainers: nitzmahone samdoran aminvakil
   $modules/system/java_cert.py:
     maintainers: haad absynth76
   $modules/system/java_keystore.py:

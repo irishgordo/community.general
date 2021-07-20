@@ -150,7 +150,7 @@ EXAMPLES = r'''
     backend: www
     wait: yes
     drain: yes
-    wait_interval: 1
+    wait_interval: 60
     wait_retries: 60
 
 - name: Disable backend server in 'www' backend pool and drop open sessions to it
@@ -211,7 +211,7 @@ import time
 from string import Template
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils._text import to_bytes, to_text
+from ansible.module_utils.common.text.converters import to_bytes, to_text
 
 
 DEFAULT_SOCKET_LOCATION = "/var/run/haproxy.sock"

@@ -6,12 +6,10 @@
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
-from collections import namedtuple
-
 import pytest
 
 from ansible_collections.community.general.plugins.module_utils.module_helper import (
-    ArgFormat, DependencyCtxMgr, ModuleHelper, VarMeta, cause_changes
+    ArgFormat, DependencyCtxMgr, VarMeta, VarDict, cause_changes
 )
 
 
@@ -144,7 +142,7 @@ def test_variable_meta_diff():
 
 
 def test_vardict():
-    vd = ModuleHelper.VarDict()
+    vd = VarDict()
     vd.set('a', 123)
     assert vd['a'] == 123
     assert vd.a == 123
@@ -153,15 +151,43 @@ def test_vardict():
     assert vd.meta('a').diff is False
     assert vd.meta('a').change is False
     vd['b'] = 456
+    assert vd.meta('b').output is True
+    assert vd.meta('b').diff is False
+    assert vd.meta('b').change is False
     vd.set_meta('a', diff=True, change=True)
     vd.set_meta('b', diff=True, output=False)
     vd['c'] = 789
+    assert vd.has_changed('c') is False
     vd['a'] = 'new_a'
+    assert vd.has_changed('a') is True
     vd['c'] = 'new_c'
+    assert vd.has_changed('c') is False
+    vd['b'] = 'new_b'
+    assert vd.has_changed('b') is False
     assert vd.a == 'new_a'
     assert vd.c == 'new_c'
     assert vd.output() == {'a': 'new_a', 'c': 'new_c'}
     assert vd.diff() == {'before': {'a': 123}, 'after': {'a': 'new_a'}}, "diff={0}".format(vd.diff())
+
+
+def test_variable_meta_change():
+    vd = VarDict()
+    vd.set('a', 123, change=True)
+    vd.set('b', [4, 5, 6], change=True)
+    vd.set('c', {'m': 7, 'n': 8, 'o': 9}, change=True)
+    vd.set('d', {'a1': {'a11': 33, 'a12': 34}}, change=True)
+
+    vd.a = 1234
+    assert vd.has_changed('a') is True
+    vd.b.append(7)
+    assert vd.b == [4, 5, 6, 7]
+    assert vd.has_changed('b')
+    vd.c.update({'p': 10})
+    assert vd.c == {'m': 7, 'n': 8, 'o': 9, 'p': 10}
+    assert vd.has_changed('c')
+    vd.d['a1'].update({'a13': 35})
+    assert vd.d == {'a1': {'a11': 33, 'a12': 34, 'a13': 35}}
+    assert vd.has_changed('d')
 
 
 class MockMH(object):

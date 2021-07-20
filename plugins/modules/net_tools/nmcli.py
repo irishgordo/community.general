@@ -57,7 +57,7 @@ options:
         choices: [ bond, bond-slave, bridge, bridge-slave, ethernet, generic, infiniband, ipip, sit, team, team-slave, vlan, vxlan, wifi ]
     mode:
         description:
-            - This is the type of device or network connection that you wish to create for a bond, team or bridge.
+            - This is the type of device or network connection that you wish to create for a bond or bridge.
         type: str
         choices: [ 802.3ad, active-backup, balance-alb, balance-rr, balance-tlb, balance-xor, broadcast ]
         default: balance-rr
@@ -77,6 +77,12 @@ options:
             - Use the format C(192.0.2.1).
             - This parameter is mutually_exclusive with never_default4 parameter.
         type: str
+    gw4_ignore_auto:
+        description:
+            - Ignore automatically configured IPv4 routes.
+        type: bool
+        default: false
+        version_added: 3.2.0
     routes4:
         description:
             - The list of ipv4 routes.
@@ -89,6 +95,11 @@ options:
             - Set metric level of ipv4 routes configured on interface.
         type: int
         version_added: 2.0.0
+    routing_rules4:
+        description:
+            - Is the same as in an C(ip route add) command, except always requires specifying a priority.
+        type: str
+        version_added: 3.3.0
     never_default4:
         description:
             - Set as default route.
@@ -107,6 +118,12 @@ options:
             - A list of DNS search domains.
         elements: str
         type: list
+    dns4_ignore_auto:
+        description:
+            - Ignore automatically configured IPv4 name servers.
+        type: bool
+        default: false
+        version_added: 3.2.0
     method4:
         description:
             - Configuration method to be used for IPv4.
@@ -114,6 +131,12 @@ options:
         type: str
         choices: [auto, link-local, manual, shared, disabled]
         version_added: 2.2.0
+    may_fail4:
+        description:
+            - If you need I(ip4) configured before C(network-online.target) is reached, set this option to C(false).
+        type: bool
+        default: true
+        version_added: 3.3.0
     ip6:
         description:
             - The IPv6 address to this interface.
@@ -125,6 +148,12 @@ options:
             - The IPv6 gateway for this interface.
             - Use the format C(2001:db8::1).
         type: str
+    gw6_ignore_auto:
+        description:
+            - Ignore automatically configured IPv6 routes.
+        type: bool
+        default: false
+        version_added: 3.2.0
     dns6:
         description:
             - A list of up to 3 dns servers.
@@ -136,12 +165,19 @@ options:
             - A list of DNS search domains.
         elements: str
         type: list
+    dns6_ignore_auto:
+        description:
+            - Ignore automatically configured IPv6 name servers.
+        type: bool
+        default: false
+        version_added: 3.2.0
     method6:
         description:
             - Configuration method to be used for IPv6
             - If I(ip6) is set, C(ipv6.method) is automatically set to C(manual) and this parameter is not needed.
+            - C(disabled) was added in community.general 3.3.0.
         type: str
-        choices: [ignore, auto, dhcp, link-local, manual, shared]
+        choices: [ignore, auto, dhcp, link-local, manual, shared, disabled]
         version_added: 2.2.0
     mtu:
         description:
@@ -229,6 +265,20 @@ options:
               frame was received on.
         type: bool
         default: yes
+    runner:
+        description:
+            - This is the type of device or network connection that you wish to create for a team.
+        type: str
+        choices: [ broadcast, roundrobin, activebackup, loadbalance, lacp ]
+        default: roundrobin
+        version_added: 3.4.0
+    runner_hwaddr_policy:
+        description:
+            - This defines the policy of how hardware addresses of team device and port devices
+              should be set during the team lifetime.
+        type: str
+        choices: [ same_all, by_active, only_active ]
+        version_added: 3.4.0
     vlanid:
         description:
             - This is only used with VLAN - VLAN ID in range <0-4095>.
@@ -614,7 +664,7 @@ RETURN = r"""#
 """
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils._text import to_text
+from ansible.module_utils.common.text.converters import to_text
 import re
 
 
@@ -648,16 +698,22 @@ class Nmcli(object):
         self.type = module.params['type']
         self.ip4 = module.params['ip4']
         self.gw4 = module.params['gw4']
+        self.gw4_ignore_auto = module.params['gw4_ignore_auto']
         self.routes4 = module.params['routes4']
         self.route_metric4 = module.params['route_metric4']
+        self.routing_rules4 = module.params['routing_rules4']
         self.never_default4 = module.params['never_default4']
         self.dns4 = module.params['dns4']
         self.dns4_search = module.params['dns4_search']
+        self.dns4_ignore_auto = module.params['dns4_ignore_auto']
         self.method4 = module.params['method4']
+        self.may_fail4 = module.params['may_fail4']
         self.ip6 = module.params['ip6']
         self.gw6 = module.params['gw6']
+        self.gw6_ignore_auto = module.params['gw6_ignore_auto']
         self.dns6 = module.params['dns6']
         self.dns6_search = module.params['dns6_search']
+        self.dns6_ignore_auto = module.params['dns6_ignore_auto']
         self.method6 = module.params['method6']
         self.mtu = module.params['mtu']
         self.stp = module.params['stp']
@@ -677,6 +733,8 @@ class Nmcli(object):
         self.hairpin = module.params['hairpin']
         self.path_cost = module.params['path_cost']
         self.mac = module.params['mac']
+        self.runner = module.params['runner']
+        self.runner_hwaddr_policy = module.params['runner_hwaddr_policy']
         self.vlanid = module.params['vlanid']
         self.vlandev = module.params['vlandev']
         self.flags = module.params['flags']
@@ -729,15 +787,21 @@ class Nmcli(object):
                 'ipv4.dhcp-client-id': self.dhcp_client_id,
                 'ipv4.dns': self.dns4,
                 'ipv4.dns-search': self.dns4_search,
+                'ipv4.ignore-auto-dns': self.dns4_ignore_auto,
                 'ipv4.gateway': self.gw4,
+                'ipv4.ignore-auto-routes': self.gw4_ignore_auto,
                 'ipv4.routes': self.routes4,
                 'ipv4.route-metric': self.route_metric4,
+                'ipv4.routing-rules': self.routing_rules4,
                 'ipv4.never-default': self.never_default4,
                 'ipv4.method': self.ipv4_method,
+                'ipv4.may-fail': self.may_fail4,
                 'ipv6.addresses': self.ip6,
                 'ipv6.dns': self.dns6,
                 'ipv6.dns-search': self.dns6_search,
+                'ipv6.ignore-auto-dns': self.dns6_ignore_auto,
                 'ipv6.gateway': self.gw6,
+                'ipv6.ignore-auto-routes': self.gw6_ignore_auto,
                 'ipv6.method': self.ipv6_method,
             })
 
@@ -778,12 +842,21 @@ class Nmcli(object):
                 'bridge.priority': self.priority,
                 'bridge.stp': self.stp,
             })
+        elif self.type == 'team':
+            options.update({
+                'team.runner': self.runner,
+                'team.runner-hwaddr-policy': self.runner_hwaddr_policy,
+            })
         elif self.type == 'bridge-slave':
             options.update({
                 'connection.slave-type': 'bridge',
                 'bridge-port.path-cost': self.path_cost,
                 'bridge-port.hairpin-mode': self.hairpin,
                 'bridge-port.priority': self.slavepriority,
+            })
+        elif self.type == 'team-slave':
+            options.update({
+                'connection.slave-type': 'team',
             })
         elif self.tunnel_conn_type:
             options.update({
@@ -900,7 +973,12 @@ class Nmcli(object):
         if setting in ('bridge.stp',
                        'bridge-port.hairpin-mode',
                        'connection.autoconnect',
-                       'ipv4.never-default'):
+                       'ipv4.never-default',
+                       'ipv4.ignore-auto-dns',
+                       'ipv4.ignore-auto-routes',
+                       'ipv4.may-fail',
+                       'ipv6.ignore-auto-dns',
+                       'ipv6.ignore-auto-routes'):
             return bool
         elif setting in ('ipv4.dns',
                          'ipv4.dns-search',
@@ -1036,17 +1114,6 @@ class Nmcli(object):
         return conn_info
 
     def _compare_conn_params(self, conn_info, options):
-        # See nmcli(1) for details
-        param_alias = {
-            'type': 'connection.type',
-            'con-name': 'connection.id',
-            'autoconnect': 'connection.autoconnect',
-            'ifname': 'connection.interface-name',
-            'master': 'connection.master',
-            'slave-type': 'connection.slave-type',
-            'zone': 'connection.zone',
-        }
-
         changed = False
         diff_before = dict()
         diff_after = dict()
@@ -1070,13 +1137,6 @@ class Nmcli(object):
                     value = value.upper()
                     # ensure current_value is also converted to uppercase in case nmcli changes behaviour
                     current_value = current_value.upper()
-            elif key in param_alias:
-                real_key = param_alias[key]
-                if real_key in conn_info:
-                    current_value = conn_info[real_key]
-                else:
-                    # alias parameter does not exist
-                    current_value = None
             else:
                 # parameter does not exist
                 current_value = None
@@ -1134,18 +1194,24 @@ def main():
                       ]),
             ip4=dict(type='str'),
             gw4=dict(type='str'),
+            gw4_ignore_auto=dict(type='bool', default=False),
             routes4=dict(type='list', elements='str'),
             route_metric4=dict(type='int'),
+            routing_rules4=dict(type='str'),
             never_default4=dict(type='bool', default=False),
             dns4=dict(type='list', elements='str'),
             dns4_search=dict(type='list', elements='str'),
+            dns4_ignore_auto=dict(type='bool', default=False),
             method4=dict(type='str', choices=['auto', 'link-local', 'manual', 'shared', 'disabled']),
+            may_fail4=dict(type='bool', default=True),
             dhcp_client_id=dict(type='str'),
             ip6=dict(type='str'),
             gw6=dict(type='str'),
+            gw6_ignore_auto=dict(type='bool', default=False),
             dns6=dict(type='list', elements='str'),
             dns6_search=dict(type='list', elements='str'),
-            method6=dict(type='str', choices=['ignore', 'auto', 'dhcp', 'link-local', 'manual', 'shared']),
+            dns6_ignore_auto=dict(type='bool', default=False),
+            method6=dict(type='str', choices=['ignore', 'auto', 'dhcp', 'link-local', 'manual', 'shared', 'disabled']),
             # Bond Specific vars
             mode=dict(type='str', default='balance-rr',
                       choices=['802.3ad', 'active-backup', 'balance-alb', 'balance-rr', 'balance-tlb', 'balance-xor', 'broadcast']),
@@ -1169,6 +1235,11 @@ def main():
             ageingtime=dict(type='int', default=300),
             hairpin=dict(type='bool', default=True),
             path_cost=dict(type='int', default=100),
+            # team specific vars
+            runner=dict(type='str', default='roundrobin',
+                             choices=['broadcast', 'roundrobin', 'activebackup', 'loadbalance', 'lacp']),
+            # team active-backup runner specific options
+            runner_hwaddr_policy=dict(type='str', choices=['same_all', 'by_active', 'only_active']),
             # vlan specific vars
             vlanid=dict(type='int'),
             vlandev=dict(type='str'),
@@ -1200,6 +1271,10 @@ def main():
     # check for issues
     if nmcli.conn_name is None:
         nmcli.module.fail_json(msg="Please specify a name for the connection")
+    # team checks
+    if nmcli.type == "team":
+        if nmcli.runner_hwaddr_policy and not nmcli.runner == "activebackup":
+            nmcli.module.fail_json(msg="Runner-hwaddr-policy is only allowed for runner activebackup")
     # team-slave checks
     if nmcli.type == 'team-slave':
         if nmcli.master is None:
